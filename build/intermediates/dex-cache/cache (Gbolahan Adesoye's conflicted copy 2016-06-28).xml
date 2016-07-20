@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<items version="2" >
+
+    <item
+        jar="C:\Users\samuel\projects\MyApplication\app\build\intermediates\exploded-aar\com.android.support\appcompat-v7\22.2.0\jars\classes.jar"
+        jumboMode="false"
+        revision="22.0.1"
+        sha1="73753982da6bde518f3a4c6b372749981d14d1a0">
+        <dex dex="C:\Users\samuel\projects\MyApplication\app\build\intermediates\pre-dexed\debug\classes-c7eec86c18b505d6ca26968a0b9b74a362b6fb96.jar" />
+    </item>
+    <item
+        jar="C:\Users\samuel\projects\mediaLab3D\app\build\intermediates\exploded-aar\com.android.support\appcompat-v7\22.2.0\jars\classes.jar"
+        jumboMode="false"
+        revision="22.0.1"
+        sha1="73753982da6bde518f3a4c6b372749981d14d1a0">
+        <dex dex="C:\Users\samuel\projects\mediaLab3D\app\build\intermediates\pre-dexed\debug\classes-f4a3bf1782fef29390401e8cba8509cf4098693a.jar" />
+    </item>
+    <item
+        jar="C:\Users\samuel\projects\MyApplication\app\build\intermediates\exploded-aar\com.android.support\support-v4\22.2.0\jars\classes.jar"
+        jumboMode="false"
+        revision="22.0.1"
+        sha1="1ee588ff2c4daf7b97c1cbf922a6c7f027285c2f">
+        <dex dex="C:\Users\samuel\projects\MyApplication\app\build\intermediates\pre-dexed\debug\classes-19c21123abfccebe04e6086bcdb6cd0486124bf6.jar" />
+    </item>
+    <item
+        jar="C:\Users\samuel\projects\mediaLab3D\app\build\intermediates\exploded-aar\com.android.support\support-v4\22.2.0\jars\classes.jar"
+        jumboMode="false"
+        revision="22.0.1"
+        sha1="1ee588ff2c4daf7b97c1cbf922a6c7f027285c2f">
+        <dex dex="C:\Users\samuel\projects\mediaLab3D\app\build\intermediates\pre-dexed\debug\classes-a0cf0dfc6d863cd6caed3b90f88fad1a523ac6aa.jar" />
+    </item>
+    <item
+        jar="C:\Users\samuel\projects\MyApplication\app\build\intermediates\exploded-aar\com.android.support\support-v4\22.2.0\jars\libs\internal_impl-22.2.0.jar"
+        jumboMode="false"
+        revision="22.0.1"
+        sha1="57f2ab85c164ff1676ec64dee787981c046fab79">
+        <dex dex="C:\Users\samuel\projects\MyApplication\app\build\intermediates\pre-dexed\debug\internal_impl-22.2.0-9dd5688adf9848f8b54236e7de9d7c3540146e31.jar" />
+    </item>
+    <item
+        jar="C:\Users\samuel\AppData\Local\Android\sdk\extras\android\m2repository\com\android\support\support-annotations\22.2.0\support-annotations-22.2.0.jar"
+        jumboMode="false"
+        revision="22.0.1"
+        sha1="66b42a1f3eb7676070b7ef7f14b603483aecbee1">
+        <dex dex="C:\Users\samuel\projects\MyApplication\app\build\intermediates\pre-dexed\debug\support-annotations-22.2.0-66e4c5ad3ba41de9c81cd2f80cdcc749546a1dd6.jar" />
+    </item>
+    <item
+        jar="C:\Users\samuel\projects\mediaLab3D\app\build\intermediates\exploded-aar\com.android.support\support-v4\22.2.0\jars\libs\internal_impl-22.2.0.jar"
+        jumboMode="false"
+        revision="22.0.1"
+        sha1="57f2ab85c164ff1676ec64dee787981c046fab79">
+        <dex dex="C:\Users\samuel\projects\mediaLab3D\app\build\intermediates\pre-dexed\debug\internal_impl-22.2.0-fa36aab7198a35d72f0fa94c916d0cc376526bac.jar" />
+    </item>
+
+</items>

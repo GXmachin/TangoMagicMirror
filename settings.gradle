@@ -1,0 +1,1 @@
+include ':app', ':tango-ux-support-library', ':tango_support_java_lib', ':tango_java_lib'

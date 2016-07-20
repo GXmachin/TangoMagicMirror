@@ -1,0 +1,2 @@
+configurations.create("default")
+artifacts.add("default", file('tango_support_java_lib.aar'))
