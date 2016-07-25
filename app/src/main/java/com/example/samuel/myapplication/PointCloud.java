@@ -1,8 +1,10 @@
 package com.example.samuel.myapplication;
 
 import android.graphics.Color;
+import android.util.Log;
 
 import org.rajawali3d.materials.Material;
+import org.rajawali3d.math.vector.Vector3;
 
 import java.nio.FloatBuffer;
 
@@ -18,9 +20,13 @@ public class PointCloud extends Points {
     public static final int PALETTE_SIZE = 360;
     public static final float HUE_BEGIN = 0;
     public static final float HUE_END = 320;
-    public double xProjNear =0;
-    public double yProjNear =0 ;
-    public double zProjNear = 0.0;
+    public Vector3 rayDirection = new Vector3(1,1,1);
+    public Vector3 rayStart = new Vector3(0,0,0);
+    private double threshold = 0.02;
+    private double alpha =0;
+    public boolean pointTouched = false;
+    public boolean aveReady = false;
+    private double ave = 0;
 
     public PointCloud(int maxPoints) {
         super(maxPoints, true);
@@ -54,9 +60,12 @@ public class PointCloud extends Points {
         pointCloudBuffer.get(points);
         pointCloudBuffer.rewind();
 
+        Log.d("gDebug" , "count: " + pointCount);
+
         int color;
         int colorIndex;
         float z;
+        int withinCount =0;
         for (int i = 0; i < pointCount; i++) {
             z = points[i * 3 + 2];
             colorIndex = (int) Math.min(z / CLOUD_MAX_Z * mPalette.length, mPalette.length - 1);
@@ -67,17 +76,64 @@ public class PointCloud extends Points {
             mColorArray[i * 4 + 2] = Color.blue(color) / 255f;
             mColorArray[i * 4 + 3] = Color.alpha(color) / 255f;
 
-            if((Math.abs(points[i * 3 ]  - xProjNear) +   Math.abs(points[i * 3  + 1]  - yProjNear)) < 0.001 ){
 
-                //use the depth of this point to calculate the alpha
+            if(!pointTouched && aveReady){
+                //use the alpha to obtain the estimated x and y
+                double eX = rayStart.x + alpha * (rayDirection.x);
+                double eY = rayStart.y + alpha * (rayDirection.y);
 
-                mColorArray[i * 4] = 0;
-                mColorArray[i * 4 + 1] = 0;
-                mColorArray[i * 4 + 2] =0;
-                mColorArray[i * 4 + 3] =0;
+
+                if((Math.abs(z- ave) ) < 0.1){//+ Math.abs(points[i * 3] - eX) + Math.abs(points[i * 3 + 1] - eY)) < 0.1){
+                //if(false){
+                    mColorArray[i * 4] = 1.0f;
+                    mColorArray[i * 4 + 1] = 1.0f;
+                    mColorArray[i * 4 + 2] =1.0f;
+                    mColorArray[i * 4 + 3] = Color.alpha(color) / 255f;
+
+                }
+
+                continue;
 
             }
+
+            if (pointTouched && !aveReady) {
+                //project the clicked point unto a plane containing the current point, by assigning d
+                alpha = (z - rayStart.z) / (rayDirection.z);
+
+                //use the alpha to obtain the estimated x and y
+                double eX = rayStart.x + alpha * (rayDirection.x);
+                double eY = rayStart.y + alpha * (rayDirection.y);
+
+
+                if ((Math.abs(points[i * 3] - eX) + Math.abs(points[i * 3 + 1] - eY)) < 0.1) {
+
+                    //use the depth of this point to calculate the alpha
+
+                    Log.d("gDebug", "Pointsssssssss");
+                    ave += z;
+
+               /*
+                mColorArray[i * 4] = 1.0f;
+                mColorArray[i * 4 + 1] = 1.0f;
+                mColorArray[i * 4 + 2] =1.0f;
+                mColorArray[i * 4 + 3] = Color.alpha(color) / 255f;
+*/
+
+                    withinCount++;
+
+                }
+
+            }
+
         }
+        if(withinCount != 0) {
+            ave = ave / withinCount;
+            aveReady = true;
+            pointTouched = false;
+        }
+
+
+
     }
 
     /**

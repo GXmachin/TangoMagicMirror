@@ -13,6 +13,7 @@ import java.nio.FloatBuffer;
 public class Points extends Object3D {
 
     private int mMaxNumberOfVertices;
+    public int drawingMode = GLES20.GL_POINTS;
 
     public Points(int numberOfPoints, boolean isCreateColors) {
         super();
@@ -63,7 +64,7 @@ public class Points extends Object3D {
 
     public void preRender() {
         super.preRender();
-        setDrawingMode(GLES20.GL_POINTS);
+        setDrawingMode(drawingMode );
         GLES10.glPointSize(5.0f);
     }
 
