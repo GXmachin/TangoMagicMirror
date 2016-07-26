@@ -64,6 +64,7 @@ public class Renderer extends RajawaliRenderer implements SensorEventListener {
     private LoaderOBJ objParser = null;
     private LoaderOBJ objParser2 = null;
     public RajawaliSurfaceView surface;
+    public int[] oglScreen;
 
     // for the camera stream
     private ATexture mTangoCameraTexture;
@@ -72,6 +73,7 @@ public class Renderer extends RajawaliRenderer implements SensorEventListener {
     private static final float CAMERA_FAR = 200f;
     private static final int MAX_NUMBER_OF_POINTS = 60000;
     private PointCloud mPointCloud;
+    public Matrix4 curreentMVP = null;
 
     public Renderer(Context context) {
         super(context);
@@ -110,6 +112,7 @@ public class Renderer extends RajawaliRenderer implements SensorEventListener {
 
        //point cloud setup
         mPointCloud = new PointCloud(MAX_NUMBER_OF_POINTS);
+        mPointCloud.currentRender = this;
         getCurrentScene().addChild(mPointCloud);
         getCurrentScene().setBackgroundColor(Color.WHITE);
 
@@ -176,14 +179,17 @@ public class Renderer extends RajawaliRenderer implements SensorEventListener {
 
 
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
-            int[] oglScreen = getInOpenGLScreenCoord(x, y);
 
-            Log.d("gDebug", "Fov: " + getCurrentCamera().getFieldOfView());
+            oglScreen = getInOpenGLScreenCoord(x, y);
+
+         /*   Log.d("gDebug", "Fov: " + getCurrentCamera().getFieldOfView());
             Vector3 unProjectedN = unProjectG((double) oglScreen[0], (double) oglScreen[1], 0);
             Vector3 unProjectedF = unProjectG((double) oglScreen[0], (double) oglScreen[1], 1);
             Vector3 rayDirection = unProjectedF.subtract(unProjectedN);
             mPointCloud.rayStart = unProjectedN;
             mPointCloud.rayDirection = rayDirection;
+
+            */
          //   double alpha = (0.5 - unProjectedN.z) / (vectDiff.z);
          //   Log.d("gDebug", "x :  " + x + " y: " + y + "view openGL: " + oglScreen[0] + " :" + oglScreen[1]);
          //   Log.d("gDebug", "ux :  " + unProjectedN.x + " uY: " + unProjectedN.y + " uZ: " + unProjectedN.z + " fX" + unProjectedF.x + " :" + unProjectedF.y + " fZ: " + unProjectedF.z + "currentZ: " + getCurrentCamera().getZ());
@@ -202,7 +208,7 @@ public class Renderer extends RajawaliRenderer implements SensorEventListener {
         int[] viewLoc = new int[2];
         surface.getLocationOnScreen(viewLoc);
 
-        Log.d("gDebug", " " + viewLoc[0] + " :" + viewLoc[1]);
+       // Log.d("gDebug", " " + viewLoc[0] + " :" + viewLoc[1]);
         return new int[]{x - viewLoc[0], y - viewLoc[1]};
 
 
@@ -222,6 +228,7 @@ public class Renderer extends RajawaliRenderer implements SensorEventListener {
 
     }
 
+
     //Now that we have this points, it is important we render them appropriately. Our camera orientation is irrespetive of where the points are
     public void updateCameraPose(TangoPoseData cameraPose){
 
@@ -234,6 +241,11 @@ public class Renderer extends RajawaliRenderer implements SensorEventListener {
 
         //changed to conjugate as its not like that in the sample code. Perhaps the different version of Rajawli used is the cause
         getCurrentCamera().setOrientation(quaternion.conjugate());
+
+
+        //update the camera matrix
+        curreentMVP = getCurrentCamera().getProjectionMatrix().clone();
+      //  curreentMVP.multiply(getCurrentCamera().getViewMatrix().clone());
 
     }
 
