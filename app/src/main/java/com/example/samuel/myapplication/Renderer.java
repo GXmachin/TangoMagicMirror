@@ -1,6 +1,8 @@
 package com.example.samuel.myapplication;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Point;
 import android.hardware.Sensor;
@@ -8,19 +10,24 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.opengl.GLES10;
 import android.opengl.GLES20;
+import android.opengl.GLException;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.SurfaceHolder;
 import android.view.animation.AccelerateDecelerateInterpolator;
 
+import com.google.android.gms.vision.text.Line;
 import com.google.atap.tangoservice.TangoPoseData;
 import com.google.atap.tangoservice.TangoXyzIjData;
 
+import org.opencv.core.Mat;
 import org.rajawali3d.Object3D;
 import org.rajawali3d.animation.Animation;
 import org.rajawali3d.animation.Animation3D;
 import org.rajawali3d.animation.EllipticalOrbitAnimation3D;
 import org.rajawali3d.animation.RotateOnAxisAnimation;
 import org.rajawali3d.animation.TranslateAnimation3D;
+import org.rajawali3d.bounds.BoundingBox;
 import org.rajawali3d.lights.DirectionalLight;
 import org.rajawali3d.lights.PointLight;
 import org.rajawali3d.loader.LoaderAWD;
@@ -31,6 +38,7 @@ import org.rajawali3d.materials.Material;
 import org.rajawali3d.materials.methods.DiffuseMethod;
 import org.rajawali3d.materials.methods.SpecularMethod;
 import org.rajawali3d.materials.plugins.FogMaterialPlugin;
+import org.rajawali3d.materials.textures.ASingleTexture;
 import org.rajawali3d.materials.textures.ATexture;
 import org.rajawali3d.materials.textures.CubeMapTexture;
 import org.rajawali3d.materials.textures.StreamingTexture;
@@ -40,14 +48,20 @@ import org.rajawali3d.math.Matrix4;
 import org.rajawali3d.math.Quaternion;
 import org.rajawali3d.math.vector.Vector3;
 import org.rajawali3d.primitives.Cube;
+import org.rajawali3d.primitives.Line3D;
+import org.rajawali3d.primitives.RectangularPrism;
 import org.rajawali3d.primitives.ScreenQuad;
 import org.rajawali3d.primitives.Sphere;
 import org.rajawali3d.renderer.RajawaliRenderer;
 import org.rajawali3d.surface.RajawaliSurfaceView;
 
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import java.text.ParseException;
 import java.util.Random;
+import java.util.Stack;
+
+import javax.microedition.khronos.opengles.GL10;
 
 /**
  * Created by samuel on 8/18/2015.
@@ -62,18 +76,26 @@ public class Renderer extends RajawaliRenderer implements SensorEventListener {
     float rotationVec[] = {0, 0, 0};
     Material faceMaterial;
     private LoaderOBJ objParser = null;
-    private LoaderOBJ objParser2 = null;
     public RajawaliSurfaceView surface;
     public int[] oglScreen;
+    private Stack<Vector3> lines = new Stack();
 
     // for the camera stream
-    private ATexture mTangoCameraTexture;
+    public ATexture mTangoCameraTexture;
 
     private static final float CAMERA_NEAR = 0.01f;
     private static final float CAMERA_FAR = 200f;
     private static final int MAX_NUMBER_OF_POINTS = 60000;
     private PointCloud mPointCloud;
     public Matrix4 curreentMVP = null;
+    public SurfaceHolder surfaceHolder = null;
+    public float[] depthMap;
+    public boolean detectH = false;
+    private boolean rectSet = false;
+
+    public DrawView boundingRect;
+
+    public Mat imgData;
 
     public Renderer(Context context) {
         super(context);
@@ -90,6 +112,9 @@ public class Renderer extends RajawaliRenderer implements SensorEventListener {
         Material tangoCameraMaterial = new Material();
         tangoCameraMaterial.setColorInfluence(0);
 
+
+
+
         // We need to use Rajawali's {@code StreamingTexture} since it sets up the texture
         // for GL_TEXTURE_EXTERNAL_OES rendering
         mTangoCameraTexture =
@@ -101,6 +126,7 @@ public class Renderer extends RajawaliRenderer implements SensorEventListener {
         } catch (ATexture.TextureException e) {
             Log.e("gDebug", "Exception creating texture for RGB camera contents", e);
         }
+
         getCurrentScene().addChildAt(backgroundQuad, 0);
 
         // Add a directional light in an arbitrary direction.
@@ -110,15 +136,50 @@ public class Renderer extends RajawaliRenderer implements SensorEventListener {
         light.setPosition(3, 2, 4);
         getCurrentScene().addLight(light);
 
+
+
+
        //point cloud setup
         mPointCloud = new PointCloud(MAX_NUMBER_OF_POINTS);
         mPointCloud.currentRender = this;
-        getCurrentScene().addChild(mPointCloud);
+       // getCurrentScene().addChild(mPointCloud);
         getCurrentScene().setBackgroundColor(Color.WHITE);
 
         getCurrentCamera().setFarPlane(CAMERA_FAR);
         getCurrentCamera().setNearPlane(CAMERA_NEAR);
         getCurrentCamera().setFieldOfView(37.5f); // data obtained from pointcloud sample
+
+
+        //initialize the array used for the depth map
+        depthMap = new float[getDefaultViewportHeight() * getDefaultViewportWidth()];
+
+
+        //load the model into the system
+        objParser = new LoaderOBJ(mContext.getResources(),
+                mTextureManager, R.raw.goblin_obj);
+
+        faceMaterial = new Material();
+        faceMaterial.enableLighting(true);
+        faceMaterial.setColor(Color.GREEN);
+        faceMaterial.setDiffuseMethod(new DiffuseMethod.Lambert());
+
+        try {
+            objParser.parse();
+            mObjectGroup = objParser.getParsedObject();
+            mObjectGroup.setMaterial(faceMaterial);
+
+            mObjectGroup.setScale(0.0005);
+       //     mObjectGroup.setPosition(0,0,3);
+
+            getCurrentScene().addChild(mObjectGroup);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+            //add point cloud for debug
+         getCurrentScene().addChild(mPointCloud);
+
 
     }
 
@@ -136,6 +197,10 @@ public class Renderer extends RajawaliRenderer implements SensorEventListener {
     public void onRender(final long elapsedTime, final double deltaTime) {
 
         super.onRender(elapsedTime, deltaTime);
+
+       Log.d("gDebug", mObjectGroup.getPosition().toString());
+
+
     }
 
 
@@ -182,6 +247,7 @@ public class Renderer extends RajawaliRenderer implements SensorEventListener {
 
             oglScreen = getInOpenGLScreenCoord(x, y);
 
+
          /*   Log.d("gDebug", "Fov: " + getCurrentCamera().getFieldOfView());
             Vector3 unProjectedN = unProjectG((double) oglScreen[0], (double) oglScreen[1], 0);
             Vector3 unProjectedF = unProjectG((double) oglScreen[0], (double) oglScreen[1], 1);
@@ -196,9 +262,17 @@ public class Renderer extends RajawaliRenderer implements SensorEventListener {
 
          //   Vector3 eV = unProjectedN.add(vectDiff.multiply(alpha));
          //   Log.d("gDebug :", "eX: " + eV.x + " eY: " + eV.y + " eZ: " + eV.z);
-        }
+
         mPointCloud.pointTouched = true;
+        detectH = true;
         mPointCloud.aveReady = false;
+    }
+
+        //point touched..
+        if(mObjectGroup != null){
+            mObjectGroup.setPosition(0,0,mPointCloud.ave);
+        }
+
         return true;
     }
 
@@ -253,5 +327,61 @@ public class Renderer extends RajawaliRenderer implements SensorEventListener {
     public int getTextureId() {
         return mTangoCameraTexture == null ? -1 : mTangoCameraTexture.getTextureId();
     }
+
+    public void setSaveCloud(){
+
+        mPointCloud.saveCloud = true;
+
+    }
+
+
+    public void tryDrawing(SurfaceHolder holder) {
+        Log.i("gDebug", "Trying to draw...");
+
+        Canvas canvas = holder.lockCanvas();
+        if (canvas == null) {
+            Log.e("gDebug", "Cannot draw onto the canvas as it's null");
+        } else {
+            drawMyStuff(canvas);
+            holder.unlockCanvasAndPost(canvas);
+        }
+    }
+
+
+    private void drawMyStuff(final Canvas canvas) {
+        Random random = new Random();
+        Log.i("gDebug", "Drawing...");
+        canvas.drawRGB(255, 128, 128);
+    }
+
+
+    public Bitmap createBitmapFromGLSurface(int x, int y, int w, int h)
+            throws OutOfMemoryError {
+        int bitmapBuffer[] = new int[w * h];
+        int bitmapSource[] = new int[w * h];
+        IntBuffer intBuffer = IntBuffer.wrap(bitmapBuffer);
+        intBuffer.position(0);
+
+        try {
+            GLES20.glReadPixels(x, y, w, h, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, intBuffer);
+            int offset1, offset2;
+            for (int i = 0; i < h; i++) {
+                offset1 = i * w;
+                offset2 = (h - i - 1) * w;
+                for (int j = 0; j < w; j++) {
+                    int texturePixel = bitmapBuffer[offset1 + j];
+                    int blue = (texturePixel >> 16) & 0xff;
+                    int red = (texturePixel << 16) & 0x00ff0000;
+                    int pixel = (texturePixel & 0xff00ff00) | red | blue;
+                    bitmapSource[offset2 + j] = pixel;
+                }
+            }
+        } catch (GLException e) {
+            return null;
+        }
+
+        return Bitmap.createBitmap(bitmapSource, w, h, Bitmap.Config.ARGB_8888);
+    }
+
 
 }

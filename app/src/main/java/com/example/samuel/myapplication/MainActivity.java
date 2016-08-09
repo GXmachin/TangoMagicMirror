@@ -1,11 +1,20 @@
 package com.example.samuel.myapplication;
 
 import android.app.Activity;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.opengl.GLES20;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.util.SparseArray;
 import android.view.MotionEvent;
+import android.view.View;
+import android.widget.Button;
 
+import com.google.android.gms.vision.Frame;
+import com.google.atap.tango.TangoJNINative;
 import com.google.atap.tango.ux.TangoUx;
 import com.google.atap.tango.ux.TangoUxLayout;
 import com.google.atap.tango.ux.UxExceptionEvent;
@@ -23,12 +32,30 @@ import com.google.atap.tangoservice.TangoXyzIjData;
 import com.projecttango.tangosupport.TangoPointCloudManager;
 import com.projecttango.tangosupport.TangoSupport;
 
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.CameraBridgeViewBase;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
+import org.opencv.core.Point;
+import org.opencv.core.Size;
+import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.objdetect.HOGDescriptor;
 import org.rajawali3d.scene.ASceneFrameCallback;
 import org.rajawali3d.surface.IRajawaliSurface;
 import org.rajawali3d.surface.RajawaliSurfaceView;
 
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import com.google.android.gms.vision.face.Face;
+import com.google.android.gms.vision.face.FaceDetector;
+
 
 
 public class MainActivity extends Activity {
@@ -44,6 +71,66 @@ public class MainActivity extends Activity {
     private final String gDebug = "gDebug";
     private final String TAG = "gDebug";
     private int mConnectedTextureIdGlThread = 0;//updated from glThread
+    private Button saveData;
+    private Button saveFrame;
+    private Button saveDepth;
+    public ByteBuffer mPixelBUffer;
+    String baseDir = android.os.Environment.getExternalStorageDirectory().getAbsolutePath();
+    private int rectTopLextX, rectTopLeftY, rectWidth, rectHeight;
+
+
+    //set up/initialize opencv
+    private final String debugTag = "gDebug";
+
+    private HOGDescriptor hog;
+
+    private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
+        @Override
+        public void onManagerConnected(int status) {
+            switch(status){
+                case BaseLoaderCallback.SUCCESS:
+                {
+                    Log.d(debugTag, "OpenCV initialized");
+                    try {
+
+                        Log.d(debugTag ,   "Here ----------->");
+                        //load the cascade file from where you saved it, I put mine in my sd card root
+
+                        String cascadeFileName = baseDir + File.separator + "haarcascade_fullbody.xml";
+                        File file = new File(cascadeFileName);
+                        Log.d(debugTag, " " + file.isAbsolute());
+
+                        //initialize the cascade classifier
+
+                        if (true  ) {
+                            Log.e(debugTag, "Failed to load cascade classifier");
+
+                            hog = new HOGDescriptor(new Size(new Point(64, 128)), new Size(new Point(16, 16)), new Size(new Point(8, 8)),
+                                    new Size(new Point(8, 8)), 9);
+
+                            hog.setSVMDetector(HOGDescriptor.getDefaultPeopleDetector());
+
+                        } else
+                            Log.i(debugTag, "Loaded cascade classifier from " + file.getAbsolutePath());
+
+
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Log.e(debugTag, "Failed to load cascade. Exception thrown: " + e);
+                    }
+
+
+                } break;
+                default:
+                {
+                    super.onManagerConnected(status);
+                } break;
+
+            }
+            //super.onManagerConnected(status);
+        }
+    };
 
     private static final ArrayList<TangoCoordinateFramePair> framePairs = new ArrayList<TangoCoordinateFramePair>();
 
@@ -58,21 +145,83 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+
+
         //final RajawaliSurfaceView surface = new RajawaliSurfaceView(this);
         mRenderer = new Renderer(this);// by default we load model 1
         mRenderer.surface = (RajawaliSurfaceView)findViewById(R.id.surface);
         mRenderer.surface.setEGLContextClientVersion(2);
-      //  mRenderer.surface.setFrameRate(60.0);
-       // mRenderer.surface.setRenderMode(IRajawaliSurface.RENDERMODE_WHEN_DIRTY);
+        mRenderer.surfaceHolder = mRenderer.surface.getHolder();
 
+
+        //get the view used to carry the  bounding rect
+        mRenderer.boundingRect = (DrawView)findViewById(R.id.drawView);
+         //initialize to see
+        mRenderer.boundingRect.setViewRect(10, 10, 100, 200);
 
 
         mRenderer.surface.setSurfaceRenderer(mRenderer);
+
+        saveData = (Button)findViewById(R.id.savData);
+
+        saveData.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mRenderer.setSaveCloud();
+            }
+        });
+
+        saveFrame = (Button)findViewById(R.id.saveFrame);
+
+        saveFrame.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+            mRenderer.tryDrawing(mRenderer.surface.getHolder());
+                //attempt to save frame
+
+             /*
+                //alocate buffer
+                mPixelBUffer = ByteBuffer.allocate(mRenderer.surface.getWidth()*mRenderer.surface.getHeight()*4);
+                Log.d("gDebug   -=------" , " " + mRenderer.surface.getWidth()*mRenderer.surface.getHeight()*4);
+                mPixelBUffer.order(ByteOrder.LITTLE_ENDIAN);
+
+                mPixelBUffer.rewind();
+                GLES20.glReadPixels(0, 0, mRenderer.surface.getWidth(), mRenderer.surface.getHeight(), GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE,
+                        mPixelBUffer);
+                BufferedOutputStream bos = null;
+                try {
+                    bos = new BufferedOutputStream(new FileOutputStream(baseDir + File.separator +"frame.png"));
+                    Bitmap bmp = Bitmap.createBitmap(mRenderer.surface.getWidth(), mRenderer.surface.getHeight(), Bitmap.Config.ARGB_8888);
+                    mPixelBUffer.rewind();
+                    bmp.copyPixelsFromBuffer(mPixelBUffer);
+                    bmp.compress(Bitmap.CompressFormat.PNG, 90, bos);
+                    bmp.recycle();
+                    if (bos != null) bos.close();
+                } catch(Exception e) {
+                    Log.e(debugTag, e.getMessage());
+                }
+                Log.d(debugTag, "saved");
+                */
+            }
+        });
+
+//initialize save depth button
+        saveDepth = (Button)findViewById(R.id.setSaveDepth);
+
+        saveDepth.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mRenderer.detectH = true;
+            }
+        });
 
         //initialize point cloud manager
         mPointCloudManager = new TangoPointCloudManager();
 
         mTangoUX = setupTangoUxAndLayout();
+
+        mRenderer.surface.setDrawingCacheEnabled(true);
 
     }
 
@@ -100,6 +249,7 @@ public class MainActivity extends Activity {
     protected void onResume(){
 
         super.onResume();
+        OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_2_4_9, this, mLoaderCallback);
         //obtain the tango configuration
 
         if (tConnected.compareAndSet(false, true)) {
@@ -124,6 +274,7 @@ public class MainActivity extends Activity {
             });
         }
 
+
     }
 
     private void setTango(){
@@ -146,11 +297,13 @@ public class MainActivity extends Activity {
                     @Override
                     public void onXyzIjAvailable(TangoXyzIjData pointCloud) {
 
+
                         if (mTangoUX != null) {
                             mTangoUX.updateXyzCount(pointCloud.xyzCount);
                         }
 
                         mPointCloudManager.updateXyzIj(pointCloud);
+
 
                     }
 
@@ -159,9 +312,9 @@ public class MainActivity extends Activity {
 
                         // Check if the frame available is for the camera we want and update its frame
                         // on the view.
-                             Log.d("gDebug" , "frame update");
+
                         if (cameraId == TangoCameraIntrinsics.TANGO_CAMERA_COLOR) {
-                            Log.d("gDebug" , "frame update");
+
                             // Mark a camera frame is available for rendering in the OpenGL thread
                             mIsFrameAvailableTangoThread.set(true);
                             // Trigger an Rajawali render to update the scene with the new RGB data.
@@ -184,6 +337,8 @@ public class MainActivity extends Activity {
     public void connectRenderer(){
 
             mRenderer.getCurrentScene().registerFrameCallback(new ASceneFrameCallback() {
+
+
                 @Override
                 public void onPreFrame(long sceneTime, double deltaTime) {
 
@@ -251,10 +406,87 @@ public class MainActivity extends Activity {
                 public void onPostFrame(long sceneTime, double deltaTime) {
 
 
+
+                    if(mRenderer.detectH){
+
+                        try {
+                            String baseDir = android.os.Environment.getExternalStorageDirectory().getAbsolutePath();
+                           // View v1 = mRenderer.surface.setDrawingCacheEnabled(true);   //getWindow().getDecorView().getRootView();
+
+                            mRenderer.createBitmapFromGLSurface(0,0,mRenderer.getDefaultViewportWidth(), mRenderer.getDefaultViewportHeight());
+                           // v1.setDrawingCacheEnabled(true);
+                            //Bitmap bitmap = Bitmap.createBitmap(v1.getDrawingCache());
+                            Bitmap bitmap =  mRenderer.createBitmapFromGLSurface(0, 0, mRenderer.getDefaultViewportWidth(), mRenderer.getDefaultViewportHeight()); //Bitmap.createBitmap(mRenderer.surface.getDrawingCache());
+
+                            Log.d("gDebug", "  " + bitmap.getHeight());
+
+                           // mRenderer.surface.setDrawingCacheEnabled(false);
+                           // v1.setDrawingCacheEnabled(false);
+
+                          //  FileOutputStream screen = new FileOutputStream(baseDir + File.separator + "frame2.png");
+
+                          //  bitmap.compress(Bitmap.CompressFormat.PNG, 100, screen);
+
+                            //Create face Detector
+                            Context context = getApplicationContext();
+                         FaceDetector detector = new FaceDetector.Builder(context)
+                                    .setClassificationType(FaceDetector.ALL_CLASSIFICATIONS)
+                                    .build();
+
+                            //get the bitmap as frame
+
+                             Frame tFrame = new Frame.Builder().setBitmap(bitmap).build();
+
+                            SparseArray<Face> faces = detector.detect(tFrame);
+
+                            if(faces!=null && faces.size()>0) {
+                                Face face1 = faces.valueAt(0);
+
+                                Log.d("gDebug", " -------------_> " + face1.getPosition().toString());
+                                rectTopLextX = (int) face1.getPosition().x;
+                                rectTopLeftY = (int) face1.getPosition().y;
+                                rectWidth =  (int) (face1.getWidth());
+                                rectHeight =  (int) ( 7.5 * face1.getHeight());
+
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+
+                                        mRenderer.boundingRect.setViewRect(rectTopLextX, rectTopLeftY, rectWidth, rectHeight);
+
+                                    }
+                                });
+
+
+
+
+                            }
+
+
+                         //   screen.flush();
+                         //   screen.close();
+
+                            bitmap.recycle();
+
+                        }catch(Exception e){
+
+                            Log.e("gDebug" , e.getMessage());
+                            e.printStackTrace();
+
+                        }
+
+                        mRenderer.detectH = false;
+                    }
+
                 }
 
                 @Override //use this to ensure the preFrame callback is registered
                 public boolean callPreFrame() {
+                    return true;
+                }
+
+                @Override //use this to ensure the preFrame callback is registered
+                public boolean callPostFrame() {
                     return true;
                 }
             });

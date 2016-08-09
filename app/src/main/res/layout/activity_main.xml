@@ -4,7 +4,6 @@
     android:layout_height="wrap_content"
    >
 
-
         <org.rajawali3d.surface.RajawaliSurfaceView
             android:id="@+id/surface"
             android:layout_width="fill_parent"
@@ -12,6 +11,40 @@
             android:layout_gravity="top"
             />
 
+
+
+    <com.example.samuel.myapplication.DrawView
+        android:id="@+id/drawView"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:layout_gravity="top"
+
+        />
+
+
+    <Button
+        android:id="@+id/savData"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentRight="true"
+        android:layout_marginBottom="15dp"
+        android:layout_marginRight="15dp"
+        android:text="Save Point cloud" />
+
+    <Button
+        android:id="@+id/saveFrame"
+        android:layout_above="@+id/savData"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Save Frame" />
+
+    <Button
+        android:id="@+id/setSaveDepth"
+        android:layout_above="@+id/saveFrame"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Ready" />
 
     <com.google.atap.tango.ux.TangoUxLayout
         android:id="@+id/layout_tango"

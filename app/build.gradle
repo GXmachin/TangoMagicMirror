@@ -26,4 +26,6 @@ dependencies {
     compile project(':tango-ux-support-library')
     compile project(':tango_java_lib')
     compile project(':tango_support_java_lib')
+    compile project(':openCVLibrary249')
+    compile 'com.google.android.gms:play-services-vision:9.4.0'
 }
